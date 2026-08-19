@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
-import cookieParser from 'cookie-parser';
-import helmet from 'helmet';
+import * as cookieParser from 'cookie-parser';
+import * as helmet from 'helmet';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -23,7 +23,7 @@ async function bootstrap() {
     }),
   );
 
-  const port = process.env.API_PORT ?? 4000;
+  const port = process.env.API_PORT ?? process.env.PORT ?? 4000;
   await app.listen(port);
   console.log(`Fedha API running on http://localhost:${port}/api/v1`);
 }
