@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountType {
+  BANK
+  MOBILE_MONEY
+  CASH
+  SAVINGS
+  INVESTMENT
+  BUSINESS
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+}
+
+enum CategoryGroup {
+  ESSENTIAL
+  PERSONAL
+  FAMILY_SOCIAL
+  FINANCIAL
+  BUSINESS
+  INCOME
+}
+
+model User {
+  id              String   @id @default(uuid())
+  name            String
+  email           String   @unique
+  passwordHash    String
+  primaryCurrency String   @default("TZS")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  accounts   Account[]
+  categories TransactionCategory[]
+  auditLogs  AuditLog[]
+
+  @@map("users")
+}
+
+model Account {
+  id             String      @id @default(uuid())
+  userId         String
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  type           AccountType
+  currency       String      @default("TZS")
+  currentBalance Int         @default(0)
+  institution    String?
+  isActive       Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  transactionsFrom Transaction[] @relation("SourceAccount")
+  transactionsTo   Transaction[] @relation("DestinationAccount")
+
+  @@index([userId])
+  @@map("accounts")
+}
+
+model TransactionCategory {
+  id             String         @id @default(uuid())
+  userId         String
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentId       String?
+  parent         TransactionCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children       TransactionCategory[] @relation("CategoryHierarchy")
+  name           String
+  group          CategoryGroup
+  isCustom       Boolean        @default(false)
+
+  transactions Transaction[]
+
+  @@index([userId])
+  @@map("transaction_categories")
+}
+
+model Transaction {
+  id                    String          @id @default(uuid())
+  type                  TransactionType
+  amount                Int
+  currency              String          @default("TZS")
+  occurredAt            DateTime
+  description            String?
+  counterparty           String?
+
+  accountId              String
+  account                 Account @relation("SourceAccount", fields: [accountId], references: [id])
+  toAccountId            String?
+  toAccount               Account? @relation("DestinationAccount", fields: [toAccountId], references: [id])
+
+  categoryId             String?
+  category               TransactionCategory? @relation(fields: [categoryId], references: [id])
+
+  isRecurringInstance    Boolean @default(false)
+
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  deletedAt              DateTime?
+
+  @@index([accountId])
+  @@index([occurredAt])
+  @@index([categoryId])
+  @@map("transactions")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String
+  entity    String
+  entityId  String
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("audit_logs")
+}

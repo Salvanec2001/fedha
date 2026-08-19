@@ -45,38 +45,65 @@ Run that twice and paste the two outputs in as the secrets.
 npm run prisma:migrate --workspace=apps/api
 ```
 
+This creates all tables from `apps/api/prisma/schema.prisma` in your Postgres
+database and generates the Prisma client.
+
 ## 4. Run it
+
+In two terminals:
 
 ```bash
 npm run dev:api    # http://localhost:4000/api/v1
 npm run dev:web    # http://localhost:3000
 ```
 
-## 5. Deploying
+Open `http://localhost:3000`, create an account, add your accounts (Bank,
+Mobile Money, Cash), and start logging income/expenses.
 
-**Database**: Railway/Neon/Supabase Postgres, connection string into `DATABASE_URL`.
+## 5. Inspecting the database (optional)
 
-**API (`apps/api`)**: deploy to Railway.
-- Root directory: `apps/api`
-- Build command: `npm install && npx prisma generate && npm run build`
-- Start command: `npx prisma migrate deploy && node dist/main.js`
-- Set all env vars from `.env.example`.
+```bash
+npm run prisma:studio --workspace=apps/api
+```
+
+Opens a browser UI over your database — useful for sanity-checking data
+while developing.
+
+## 6. Deploying
+
+**Database**: create a managed Postgres instance (Railway, Neon, or
+Supabase all have free/cheap tiers). Copy the connection string into
+`DATABASE_URL`.
+
+**API (`apps/api`)**: deploy to Railway or Render.
+- Build command: `npm install && npm run build --workspace=apps/api && npx prisma migrate deploy --schema=apps/api/prisma/schema.prisma`
+- Start command: `node apps/api/dist/main.js`
+- Set all the env vars from `.env.example` in the platform's dashboard —
+  never commit real secrets to git.
 
 **Frontend (`apps/web`)**: deploy to Vercel.
 - Root directory: `apps/web`
-- Set `NEXT_PUBLIC_API_URL` to your deployed API URL.
-- Set `WEB_ORIGIN` on the API side to your Vercel URL for CORS.
+- Set `NEXT_PUBLIC_API_URL` to your deployed API's URL, e.g.
+  `https://fedha-api.up.railway.app/api/v1`
+- Set `WEB_ORIGIN` on the API side to your deployed frontend URL, so CORS
+  allows it.
 
 ## What's implemented (Phase 2)
 
 - User registration/login with hashed passwords and JWT auth
-- Accounts: Bank / Mobile Money / Cash / Savings / Investment / Business
-- Transactions: income, expense, transfer, atomic balance updates, audit log, soft-delete only
+- Accounts: Bank / Mobile Money / Cash / Savings / Investment / Business,
+  each with a live balance
+- Transactions: income, expense, and transfer, with atomic balance updates
+  and a full audit log — nothing is ever hard-deleted, only soft-deleted
+  ("voided"), so your history stays intact
 - Dashboard: total balance, this month's income/expenses, net cash flow
 
-## What's next
+## What's next (per the Phase 1 roadmap)
 
-- Phase 3: budgets, savings goals, debts, receivables
-- Phase 4: forecasting, health score, affordability calculator, AI assistant
-- Phase 5: investments, net worth, scenario simulator, receipt OCR, reports
-- Phase 6: security hardening, full test coverage, production polish
+- **Phase 3**: budgets, savings goals, debts, receivables
+- **Phase 4**: cash-flow forecasting, financial health score, the
+  "Can I afford this?" calculator, the AI assistant
+- **Phase 5**: investments, net worth, scenario simulator, receipt OCR,
+  reports, notifications
+- **Phase 6**: security hardening, full test coverage, performance and
+  accessibility passes, production deployment polish
