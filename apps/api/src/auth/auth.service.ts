@@ -2,7 +2,7 @@ import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/co
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
-import { RegisterDto, LoginDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, RefreshDto } from './dto/auth.dto';
 import { DEFAULT_CATEGORIES } from '../../prisma/seed';
 
 const BCRYPT_ROUNDS = 12;
@@ -51,6 +51,22 @@ export class AuthService {
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) {
       throw new UnauthorizedException('Invalid email or password');
+    }
+
+    return this.issueTokens(user.id, user.email);
+  }
+
+  async refresh(dto: RefreshDto) {
+    let payload: { sub: string; email: string };
+    try {
+      payload = this.jwt.verify(dto.refreshToken, { secret: process.env.JWT_REFRESH_SECRET });
+    } catch {
+      throw new UnauthorizedException('Session expired, please log in again');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    if (!user) {
+      throw new UnauthorizedException('Session expired, please log in again');
     }
 
     return this.issueTokens(user.id, user.email);
