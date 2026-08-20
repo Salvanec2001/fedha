@@ -1,17 +1,22 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
-import { RegisterDto, LoginDto, RefreshDto } from './dto/auth.dto';
+import { NotificationsService } from '../notifications/notifications.service';
+import { RegisterDto, LoginDto, RefreshDto, VerifyPhoneDto, UpdatePhoneDto } from './dto/auth.dto';
 import { DEFAULT_CATEGORIES } from '../../prisma/seed';
 
 const BCRYPT_ROUNDS = 12;
+const EMAIL_TOKEN_TTL_HOURS = 24;
+const PHONE_CODE_TTL_MINUTES = 10;
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -21,6 +26,8 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+    const emailVerificationExpires = new Date(Date.now() + EMAIL_TOKEN_TTL_HOURS * 60 * 60 * 1000);
 
     const user = await this.prisma.user.create({
       data: {
@@ -28,11 +35,12 @@ export class AuthService {
         email: dto.email,
         passwordHash,
         primaryCurrency: dto.primaryCurrency ?? 'TZS',
+        phone: dto.phone,
+        emailVerificationToken,
+        emailVerificationExpires,
       },
     });
 
-    // Seed default categories for this user so the dashboard/transactions
-    // screens aren't empty on first login.
     await this.prisma.transactionCategory.createMany({
       data: DEFAULT_CATEGORIES.map((c) => ({
         userId: user.id,
@@ -40,6 +48,17 @@ export class AuthService {
         group: c.group as any,
       })),
     });
+
+    const verifyUrl = `${process.env.WEB_ORIGIN}/verify-email?token=${emailVerificationToken}`;
+    this.notifications
+      .sendEmail(
+        user.id,
+        user.email,
+        'email_verification',
+        'Verify your Fedha account',
+        `Hi ${user.name},\n\nWelcome to Fedha. Please verify your email by opening this link:\n${verifyUrl}\n\nThis link expires in ${EMAIL_TOKEN_TTL_HOURS} hours.`,
+      )
+      .catch(() => {});
 
     return this.issueTokens(user.id, user.email);
   }
@@ -52,8 +71,6 @@ export class AuthService {
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) {
-      // Deliberately identical message to the "no user" case above —
-      // never reveal whether the email exists.
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -74,6 +91,89 @@ export class AuthService {
     }
 
     return this.issueTokens(user.id, user.email);
+  }
+
+  async verifyEmail(token: string) {
+    const user = await this.prisma.user.findFirst({ where: { emailVerificationToken: token } });
+    if (!user || !user.emailVerificationExpires || user.emailVerificationExpires < new Date()) {
+      throw new BadRequestException('Verification link is invalid or has expired');
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true, emailVerificationToken: null, emailVerificationExpires: null },
+    });
+
+    return { verified: true };
+  }
+
+  async requestPhoneVerification(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException();
+    if (!user.phone) throw new BadRequestException('Add a phone number to your profile first');
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = new Date(Date.now() + PHONE_CODE_TTL_MINUTES * 60 * 1000);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { phoneVerificationCode: code, phoneVerificationExpires: expires },
+    });
+
+    await this.notifications.sendSms(
+      userId,
+      user.phone,
+      'phone_verification',
+      `Your Fedha verification code is ${code}. It expires in ${PHONE_CODE_TTL_MINUTES} minutes.`,
+    );
+
+    return { sent: true };
+  }
+
+  async verifyPhone(userId: string, dto: VerifyPhoneDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException();
+    if (
+      !user.phoneVerificationCode ||
+      user.phoneVerificationCode !== dto.code ||
+      !user.phoneVerificationExpires ||
+      user.phoneVerificationExpires < new Date()
+    ) {
+      throw new BadRequestException('Verification code is invalid or has expired');
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { phoneVerified: true, phoneVerificationCode: null, phoneVerificationExpires: null },
+    });
+
+    return { verified: true };
+  }
+
+  async updatePhone(userId: string, dto: UpdatePhoneDto) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { phone: dto.phone, phoneVerified: false },
+      select: { id: true, phone: true, phoneVerified: true },
+    });
+  }
+
+  async me(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        primaryCurrency: true,
+        emailVerified: true,
+        phoneVerified: true,
+        createdAt: true,
+      },
+    });
+    if (!user) throw new UnauthorizedException();
+    return user;
   }
 
   private issueTokens(userId: string, email: string) {

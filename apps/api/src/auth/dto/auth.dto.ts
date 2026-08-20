@@ -15,6 +15,10 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   primaryCurrency?: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
 }
 
 export class LoginDto {
@@ -28,4 +32,19 @@ export class LoginDto {
 export class RefreshDto {
   @IsString()
   refreshToken: string;
+}
+
+export class VerifyEmailDto {
+  @IsString()
+  token: string;
+}
+
+export class VerifyPhoneDto {
+  @IsString()
+  code: string;
+}
+
+export class UpdatePhoneDto {
+  @IsString()
+  phone: string;
 }

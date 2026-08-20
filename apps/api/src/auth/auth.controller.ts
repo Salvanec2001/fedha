@@ -1,7 +1,9 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, RefreshDto } from './dto/auth.dto';
+import { JwtAuthGuard } from './jwt-auth.guard';
+import { CurrentUser } from '../common/current-user.decorator';
+import { RegisterDto, LoginDto, RefreshDto, VerifyEmailDto, VerifyPhoneDto, UpdatePhoneDto } from './dto/auth.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -23,5 +25,39 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   refresh(@Body() dto: RefreshDto) {
     return this.authService.refresh(dto);
+  }
+
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  verifyEmail(@Body() dto: VerifyEmailDto) {
+    return this.authService.verifyEmail(dto.token);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  me(@CurrentUser() user: { userId: string }) {
+    return this.authService.me(user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('phone')
+  @HttpCode(HttpStatus.OK)
+  updatePhone(@CurrentUser() user: { userId: string }, @Body() dto: UpdatePhoneDto) {
+    return this.authService.updatePhone(user.userId, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('phone/request-verification')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  requestPhoneVerification(@CurrentUser() user: { userId: string }) {
+    return this.authService.requestPhoneVerification(user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('phone/verify')
+  @HttpCode(HttpStatus.OK)
+  verifyPhone(@CurrentUser() user: { userId: string }, @Body() dto: VerifyPhoneDto) {
+    return this.authService.verifyPhone(user.userId, dto);
   }
 }
