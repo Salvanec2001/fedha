@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { apiFetch, setToken } from '../../lib/api';
+import { apiFetch, setTokens } from '../../lib/api';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -22,7 +22,7 @@ export default function RegisterPage() {
         method: 'POST',
         body: JSON.stringify({ name, email, password, primaryCurrency: 'TZS' }),
       });
-      setToken(res.accessToken);
+      setTokens(res.accessToken, res.refreshToken);
       router.push('/dashboard');
     } catch (err: any) {
       setError(err.message ?? 'Registration failed');

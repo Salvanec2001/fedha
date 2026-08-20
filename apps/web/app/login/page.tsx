@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { apiFetch, setToken } from '../../lib/api';
+import { apiFetch, setTokens } from '../../lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,7 +21,7 @@ export default function LoginPage() {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
-      setToken(res.accessToken);
+      setTokens(res.accessToken, res.refreshToken);
       router.push('/dashboard');
     } catch (err: any) {
       setError(err.message ?? 'Login failed');
