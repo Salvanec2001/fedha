@@ -1,3 +1,4 @@
+// Fedha — core schema
 generator client {
   provider = "prisma-client-js"
 }
@@ -31,18 +32,40 @@ enum CategoryGroup {
   INCOME
 }
 
+enum NotificationChannel {
+  EMAIL
+  SMS
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
 model User {
   id              String   @id @default(uuid())
   name            String
   email           String   @unique
   passwordHash    String
   primaryCurrency String   @default("TZS")
+  phone           String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  accounts   Account[]
-  categories TransactionCategory[]
-  auditLogs  AuditLog[]
+  emailVerified            Boolean   @default(false)
+  emailVerificationToken   String?
+  emailVerificationExpires DateTime?
+
+  phoneVerified            Boolean   @default(false)
+  phoneVerificationCode    String?
+  phoneVerificationExpires DateTime?
+
+  accounts      Account[]
+  categories    TransactionCategory[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
 
   @@map("users")
 }
@@ -97,6 +120,8 @@ model Transaction {
   account                 Account @relation("SourceAccount", fields: [accountId], references: [id])
   toAccountId            String?
   toAccount               Account? @relation("DestinationAccount", fields: [toAccountId], references: [id])
+  externalRecipientName          String?
+  externalRecipientAccountNumber String?
 
   categoryId             String?
   category               TransactionCategory? @relation(fields: [categoryId], references: [id])
@@ -126,4 +151,22 @@ model AuditLog {
 
   @@index([userId])
   @@map("audit_logs")
+}
+
+model Notification {
+  id        String              @id @default(uuid())
+  userId    String
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel   NotificationChannel
+  type      String
+  recipient String
+  subject   String?
+  message   String
+  status    NotificationStatus  @default(PENDING)
+  error     String?
+  createdAt DateTime            @default(now())
+  sentAt    DateTime?
+
+  @@index([userId])
+  @@map("notifications")
 }
