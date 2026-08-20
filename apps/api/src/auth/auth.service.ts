@@ -31,6 +31,8 @@ export class AuthService {
       },
     });
 
+    // Seed default categories for this user so the dashboard/transactions
+    // screens aren't empty on first login.
     await this.prisma.transactionCategory.createMany({
       data: DEFAULT_CATEGORIES.map((c) => ({
         userId: user.id,
@@ -50,6 +52,8 @@ export class AuthService {
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) {
+      // Deliberately identical message to the "no user" case above —
+      // never reveal whether the email exists.
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -61,12 +65,12 @@ export class AuthService {
     try {
       payload = this.jwt.verify(dto.refreshToken, { secret: process.env.JWT_REFRESH_SECRET });
     } catch {
-      throw new UnauthorizedException('Session expired, please log in again');
+      throw new UnauthorizedException('Refresh token is invalid or expired, please log in again');
     }
 
     const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
     if (!user) {
-      throw new UnauthorizedException('Session expired, please log in again');
+      throw new UnauthorizedException('Account no longer exists');
     }
 
     return this.issueTokens(user.id, user.email);
