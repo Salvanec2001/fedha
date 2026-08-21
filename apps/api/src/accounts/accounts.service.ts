@@ -1,13 +1,18 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateAccountDto, UpdateAccountDto } from './dto/account.dto';
+import { formatMoney } from '../common/format-money';
 
 @Injectable()
 export class AccountsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async create(userId: string, dto: CreateAccountDto) {
-    return this.prisma.account.create({
+    const account = await this.prisma.account.create({
       data: {
         userId,
         name: dto.name,
@@ -17,6 +22,21 @@ export class AccountsService {
         institution: dto.institution,
       },
     });
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (user) {
+      this.notifications
+        .sendEmail(
+          userId,
+          user.email,
+          'account_created',
+          'New account added to Fedha',
+          `Hi ${user.name},\n\nA new account "${account.name}" (${account.type}) was added to your Fedha profile with an opening balance of ${formatMoney(account.currentBalance, account.currency)}.\n\nIf you didn't do this, please secure your account immediately.`,
+        )
+        .catch(() => {});
+    }
+
+    return account;
   }
 
   async findAllForUser(userId: string) {
