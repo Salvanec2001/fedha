@@ -13,12 +13,14 @@ export default function NavBar() {
   }
 
   return (
-    <nav className="bg-fedha-navy text-white px-6 py-4 flex items-center justify-between">
+    <nav className="bg-fedha-navy text-white px-6 py-4 flex items-center justify-between flex-wrap gap-2">
       <span className="font-bold text-lg">Fedha</span>
-      <div className="flex gap-6 text-sm">
+      <div className="flex gap-4 text-sm flex-wrap">
         <Link href="/dashboard" className="hover:text-fedha-gold">Dashboard</Link>
         <Link href="/accounts" className="hover:text-fedha-gold">Accounts</Link>
         <Link href="/transactions" className="hover:text-fedha-gold">Transactions</Link>
+        <Link href="/reports" className="hover:text-fedha-gold">Reports</Link>
+        <Link href="/profile" className="hover:text-fedha-gold">Profile</Link>
         <button onClick={logout} className="hover:text-fedha-gold">Log out</button>
       </div>
     </nav>

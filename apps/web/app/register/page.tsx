@@ -9,6 +9,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -20,7 +21,7 @@ export default function RegisterPage() {
     try {
       const res = await apiFetch('/auth/register', {
         method: 'POST',
-        body: JSON.stringify({ name, email, password, primaryCurrency: 'TZS' }),
+        body: JSON.stringify({ name, email, password, phone: phone || undefined, primaryCurrency: 'TZS' }),
       });
       setTokens(res.accessToken, res.refreshToken);
       router.push('/dashboard');
@@ -52,6 +53,14 @@ export default function RegisterPage() {
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          className="w-full mb-4 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-fedha-navy"
+        />
+
+        <label className="block text-sm font-medium mb-1">Phone (optional)</label>
+        <input
+          placeholder="e.g. +255712345678"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
           className="w-full mb-4 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-fedha-navy"
         />
 

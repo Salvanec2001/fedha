@@ -1,6 +1,5 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'https://fedha-api-production.up.railway.app/api/v1';
 
-// MVP token storage: good enough for a solo, single-device app.
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('fedha_access_token');
@@ -16,7 +15,6 @@ export function setTokens(accessToken: string, refreshToken?: string) {
   if (refreshToken) localStorage.setItem('fedha_refresh_token', refreshToken);
 }
 
-// Kept for backward compatibility with existing call sites.
 export function setToken(accessToken: string) {
   localStorage.setItem('fedha_access_token', accessToken);
 }
@@ -28,9 +26,6 @@ export function clearToken() {
 
 let refreshPromise: Promise<boolean> | null = null;
 
-// Tries to exchange the stored refresh token for a new access token.
-// Returns true on success. De-duplicates concurrent refresh attempts so
-// multiple failed requests firing at once don't race each other.
 async function tryRefresh(): Promise<boolean> {
   if (refreshPromise) return refreshPromise;
 
@@ -69,8 +64,6 @@ export async function apiFetch(path: string, options: RequestInit = {}, _isRetry
   });
 
   if (res.status === 401 && !_isRetry) {
-    // Access token likely expired — try a silent refresh and retry once
-    // before giving up, instead of surfacing "Unauthorized" to the user.
     const refreshed = await tryRefresh();
     if (refreshed) {
       return apiFetch(path, options, true);
@@ -91,8 +84,23 @@ export async function apiFetch(path: string, options: RequestInit = {}, _isRetry
   return res.json();
 }
 
-// Formats an integer amount stored in the smallest currency unit (e.g. cents)
-// into a human-readable string, e.g. 150000 -> "TZS 1,500.00"
+export async function apiDownload(path: string, filename: string) {
+  const token = getToken();
+  const res = await fetch(`${API_URL}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error(`Download failed (${res.status})`);
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
+
 export function formatMoney(amountInSmallestUnit: number, currency = 'TZS') {
   const major = amountInSmallestUnit / 100;
   return new Intl.NumberFormat('en-US', {
