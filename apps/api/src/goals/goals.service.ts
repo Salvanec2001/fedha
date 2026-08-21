@@ -14,7 +14,7 @@ export class GoalsService {
         currentAmount: dto.currentAmount ?? 0,
         deadline: dto.deadline ? new Date(dto.deadline) : null,
         monthlyContribution: dto.monthlyContribution ?? 0,
-        priority: dto.priority ?? 'MEDIUM',
+        priority: (dto.priority ?? 'MEDIUM') as any,
       },
     });
   }
