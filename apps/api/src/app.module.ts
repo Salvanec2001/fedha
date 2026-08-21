@@ -9,6 +9,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { UsersModule } from './users/users.module';
 import { ReportsModule } from './reports/reports.module';
+import { BudgetsModule } from './budgets/budgets.module';
+import { GoalsModule } from './goals/goals.module';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { ReportsModule } from './reports/reports.module';
     DashboardModule,
     UsersModule,
     ReportsModule,
+    BudgetsModule,
+    GoalsModule,
   ],
 })
 export class AppModule {}

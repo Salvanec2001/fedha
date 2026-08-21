@@ -1,4 +1,7 @@
 // Fedha — core schema
+// Money is stored as Int in the smallest currency unit (e.g. cents) to avoid
+// floating point rounding errors in financial calculations.
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -66,6 +69,8 @@ model User {
   categories    TransactionCategory[]
   auditLogs     AuditLog[]
   notifications Notification[]
+  budgets       Budget[]
+  savingsGoals  SavingsGoal[]
 
   @@map("users")
 }
@@ -102,6 +107,7 @@ model TransactionCategory {
   isCustom       Boolean        @default(false)
 
   transactions Transaction[]
+  budgets      Budget[]
 
   @@index([userId])
   @@map("transaction_categories")
@@ -169,4 +175,47 @@ model Notification {
 
   @@index([userId])
   @@map("notifications")
+}
+
+enum BudgetPeriod {
+  WEEKLY
+  MONTHLY
+  ANNUAL
+}
+
+enum GoalPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Budget {
+  id         String       @id @default(uuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId String?
+  category   TransactionCategory? @relation(fields: [categoryId], references: [id])
+  name       String
+  period     BudgetPeriod @default(MONTHLY)
+  amount     Int
+  createdAt  DateTime     @default(now())
+
+  @@index([userId])
+  @@map("budgets")
+}
+
+model SavingsGoal {
+  id                  String       @id @default(uuid())
+  userId              String
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                String
+  targetAmount        Int
+  currentAmount       Int          @default(0)
+  deadline            DateTime?
+  monthlyContribution Int          @default(0)
+  priority            GoalPriority @default(MEDIUM)
+  createdAt           DateTime     @default(now())
+
+  @@index([userId])
+  @@map("savings_goals")
 }
