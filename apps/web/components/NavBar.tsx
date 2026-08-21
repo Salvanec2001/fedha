@@ -19,6 +19,8 @@ export default function NavBar() {
         <Link href="/dashboard" className="hover:text-fedha-gold">Dashboard</Link>
         <Link href="/accounts" className="hover:text-fedha-gold">Accounts</Link>
         <Link href="/transactions" className="hover:text-fedha-gold">Transactions</Link>
+        <Link href="/budgets" className="hover:text-fedha-gold">Budgets</Link>
+        <Link href="/goals" className="hover:text-fedha-gold">Goals</Link>
         <Link href="/reports" className="hover:text-fedha-gold">Reports</Link>
         <Link href="/profile" className="hover:text-fedha-gold">Profile</Link>
         <button onClick={logout} className="hover:text-fedha-gold">Log out</button>

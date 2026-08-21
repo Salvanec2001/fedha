@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import NavBar from '../../components/NavBar';
+import Footer from '../../components/Footer';
 import { apiFetch, formatMoney, getToken } from '../../lib/api';
 
 type Summary = {
@@ -29,7 +30,6 @@ function Card({ label, value, tone }: { label: string; value: string; tone?: 'go
 export default function DashboardPage() {
   const router = useRouter();
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -40,23 +40,13 @@ export default function DashboardPage() {
     apiFetch('/dashboard/summary')
       .then(setSummary)
       .catch((err) => setError(err.message));
-    apiFetch('/users/me')
-      .then((u) => setEmailVerified(u.emailVerified))
-      .catch(() => {});
   }, [router]);
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-gray-50 flex flex-col">
       <NavBar />
-      <div className="max-w-5xl mx-auto px-6 py-8">
+      <div className="max-w-5xl mx-auto px-6 py-8 flex-1 w-full">
         <h1 className="text-2xl font-bold text-fedha-navy mb-4">Your Financial Overview</h1>
-
-        {emailVerified === false && (
-          <div className="mb-6 px-4 py-3 rounded-lg bg-fedha-amber/10 border border-fedha-amber text-sm text-fedha-navy">
-            Please verify your email — check your inbox for a link from Fedha, or update your{' '}
-            <Link href="/profile" className="underline font-medium">profile</Link>.
-          </div>
-        )}
 
         {error && <p className="text-fedha-red mb-4">{error}</p>}
 
@@ -108,6 +98,7 @@ export default function DashboardPage() {
           </>
         )}
       </div>
+      <Footer />
     </main>
   );
 }

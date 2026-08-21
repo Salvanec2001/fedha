@@ -2,8 +2,9 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Fedha — Your Financial Operating System',
-  description: 'Understand, control, and plan every shilling you earn.',
+  title: 'Fedha — Your Money. Your Plan. Your Future.',
+  description: 'Fedha is a professional personal financial management platform for tracking money, managing budgets, building savings, managing debt, and making smarter financial decisions.',
+  themeColor: '#0B1F3A',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
