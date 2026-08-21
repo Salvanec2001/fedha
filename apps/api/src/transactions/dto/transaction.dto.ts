@@ -1,4 +1,4 @@
-import { IsDateString, IsEnum, IsInt, IsOptional, IsPositive, IsString, ValidateIf } from 'class-validator';
+import { IsDateString, IsEnum, IsInt, IsOptional, IsPositive, IsString } from 'class-validator';
 import { TransactionType } from '@prisma/client';
 
 export class CreateTransactionDto {
@@ -19,9 +19,17 @@ export class CreateTransactionDto {
   @IsString()
   accountId: string;
 
-  @ValidateIf((o) => o.type === 'TRANSFER')
+  @IsOptional()
   @IsString()
   toAccountId?: string;
+
+  @IsOptional()
+  @IsString()
+  externalRecipientName?: string;
+
+  @IsOptional()
+  @IsString()
+  externalRecipientAccountNumber?: string;
 
   @IsOptional()
   @IsString()
@@ -56,4 +64,8 @@ export class ListTransactionsQuery {
   @IsOptional()
   @IsEnum(TransactionType)
   type?: TransactionType;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
 }
