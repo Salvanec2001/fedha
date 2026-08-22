@@ -45,7 +45,7 @@ export default function DashboardPage() {
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
       <NavBar />
-      <div className="max-w-5xl mx-auto px-6 py-8 flex-1 w-full">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 flex-1 w-full">
         <h1 className="text-2xl font-bold text-fedha-navy mb-4">Your Financial Overview</h1>
 
         {error && <p className="text-fedha-red mb-4">{error}</p>}

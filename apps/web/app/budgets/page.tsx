@@ -60,7 +60,7 @@ export default function BudgetsPage() {
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
       <NavBar />
-      <div className="max-w-3xl mx-auto px-6 py-8 flex-1 w-full">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8 flex-1 w-full">
         <h1 className="text-2xl font-bold text-fedha-navy mb-6">Budgets</h1>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-xl border p-6 shadow-sm mb-8">
