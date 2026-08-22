@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PushService } from '../notifications/push.service';
 import { CreateAccountDto, UpdateAccountDto } from './dto/account.dto';
 import { formatMoney } from '../common/format-money';
 
@@ -9,6 +10,7 @@ export class AccountsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly push: PushService,
   ) {}
 
   async create(userId: string, dto: CreateAccountDto) {
@@ -23,6 +25,10 @@ export class AccountsService {
       },
     });
 
+    await this.prisma.auditLog.create({
+      data: { userId, action: 'account.create', entity: 'account', entityId: account.id, after: account as any },
+    });
+
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (user) {
       this.notifications
@@ -34,6 +40,7 @@ export class AccountsService {
           `Hi ${user.name},\n\nA new account "${account.name}" (${account.type}) was added to your Fedha profile with an opening balance of ${formatMoney(account.currentBalance, account.currency)}.\n\nIf you didn't do this, please secure your account immediately.`,
         )
         .catch(() => {});
+      this.push.notify(userId, 'Account added', `"${account.name}" was added to your accounts.`).catch(() => {});
     }
 
     return account;
@@ -54,12 +61,20 @@ export class AccountsService {
   }
 
   async update(userId: string, accountId: string, dto: UpdateAccountDto) {
-    await this.findOneOwned(userId, accountId);
-    return this.prisma.account.update({ where: { id: accountId }, data: dto });
+    const existing = await this.findOneOwned(userId, accountId);
+    const updated = await this.prisma.account.update({ where: { id: accountId }, data: dto });
+    await this.prisma.auditLog.create({
+      data: { userId, action: 'account.update', entity: 'account', entityId: accountId, before: existing as any, after: updated as any },
+    });
+    return updated;
   }
 
   async deactivate(userId: string, accountId: string) {
-    await this.findOneOwned(userId, accountId);
-    return this.prisma.account.update({ where: { id: accountId }, data: { isActive: false } });
+    const existing = await this.findOneOwned(userId, accountId);
+    const updated = await this.prisma.account.update({ where: { id: accountId }, data: { isActive: false } });
+    await this.prisma.auditLog.create({
+      data: { userId, action: 'account.delete', entity: 'account', entityId: accountId, before: existing as any },
+    });
+    return updated;
   }
 }

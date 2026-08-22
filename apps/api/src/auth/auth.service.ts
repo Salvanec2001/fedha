@@ -4,7 +4,7 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { RegisterDto, LoginDto, RefreshDto, VerifyPhoneDto, UpdatePhoneDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, RefreshDto, VerifyPhoneDto, UpdatePhoneDto, UpdateProfileDto } from './dto/auth.dto';
 import { DEFAULT_CATEGORIES } from '../../prisma/seed';
 
 const BCRYPT_ROUNDS = 12;
@@ -158,6 +158,17 @@ export class AuthService {
     });
   }
 
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        name: dto.name,
+        avatarUrl: dto.avatarUrl,
+      },
+      select: { id: true, name: true, email: true, phone: true, avatarUrl: true, primaryCurrency: true, emailVerified: true, phoneVerified: true },
+    });
+  }
+
   async me(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -166,6 +177,7 @@ export class AuthService {
         name: true,
         email: true,
         phone: true,
+        avatarUrl: true,
         primaryCurrency: true,
         emailVerified: true,
         phoneVerified: true,

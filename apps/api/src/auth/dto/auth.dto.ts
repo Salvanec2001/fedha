@@ -48,3 +48,13 @@ export class UpdatePhoneDto {
   @IsString()
   phone: string;
 }
+
+export class UpdateProfileDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  avatarUrl?: string;
+}
