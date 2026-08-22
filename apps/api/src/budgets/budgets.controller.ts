@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../common/current-user.decorator';
 import { BudgetsService } from './budgets.service';
@@ -16,6 +16,11 @@ export class BudgetsController {
   @Get()
   findAll(@CurrentUser() user: { userId: string }) {
     return this.budgetsService.findAllForUser(user.userId);
+  }
+
+  @Patch(':id')
+  update(@CurrentUser() user: { userId: string }, @Param('id') id: string, @Body() dto: any) {
+    return this.budgetsService.update(user.userId, id, dto);
   }
 
   @Delete(':id')

@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PushService } from '../notifications/push.service';
 import { CreateTransactionDto, ListTransactionsQuery } from './dto/transaction.dto';
 import { formatMoney } from '../common/format-money';
 
@@ -9,6 +10,7 @@ export class TransactionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly push: PushService,
   ) {}
 
   async create(userId: string, dto: CreateTransactionDto) {
@@ -107,6 +109,9 @@ export class TransactionsService {
           `${label} recorded: ${formatMoney(transaction.amount, transaction.currency)}`,
           `Hi ${user.name},\n\nA ${label.toLowerCase()} of ${formatMoney(transaction.amount, transaction.currency)} was recorded${transaction.description ? ` ("${transaction.description}")` : ''} on ${new Date(transaction.occurredAt).toLocaleDateString()}.\n\nIf this wasn't you, please review your account.`,
         )
+        .catch(() => {});
+      this.push
+        .notify(userId, `${label} recorded`, `${label} of ${formatMoney(transaction.amount, transaction.currency)} was recorded.`)
         .catch(() => {});
     }
 

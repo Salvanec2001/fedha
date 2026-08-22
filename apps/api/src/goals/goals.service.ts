@@ -1,12 +1,16 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PushService } from '../notifications/push.service';
 
 @Injectable()
 export class GoalsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly push: PushService,
+  ) {}
 
   async create(userId: string, dto: { name: string; targetAmount: number; currentAmount?: number; deadline?: string; monthlyContribution?: number; priority?: string }) {
-    return this.prisma.savingsGoal.create({
+    const goal = await this.prisma.savingsGoal.create({
       data: {
         userId,
         name: dto.name,
@@ -17,6 +21,11 @@ export class GoalsService {
         priority: (dto.priority ?? 'MEDIUM') as any,
       },
     });
+    await this.prisma.auditLog.create({
+      data: { userId, action: 'goal.create', entity: 'savings_goal', entityId: goal.id, after: goal as any },
+    });
+    this.push.notify(userId, 'Savings goal created', `"${goal.name}" goal was created.`).catch(() => {});
+    return goal;
   }
 
   async findAllForUser(userId: string) {
@@ -46,20 +55,49 @@ export class GoalsService {
     });
   }
 
+  async update(userId: string, id: string, dto: { name?: string; targetAmount?: number; monthlyContribution?: number; deadline?: string }) {
+    const existing = await this.prisma.savingsGoal.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Goal not found');
+    if (existing.userId !== userId) throw new ForbiddenException();
+    const updated = await this.prisma.savingsGoal.update({
+      where: { id },
+      data: {
+        name: dto.name,
+        targetAmount: dto.targetAmount,
+        monthlyContribution: dto.monthlyContribution,
+        deadline: dto.deadline ? new Date(dto.deadline) : undefined,
+      },
+    });
+    await this.prisma.auditLog.create({
+      data: { userId, action: 'goal.update', entity: 'savings_goal', entityId: id, before: existing as any, after: updated as any },
+    });
+    return updated;
+  }
+
   async contribute(userId: string, id: string, amount: number) {
     const goal = await this.prisma.savingsGoal.findUnique({ where: { id } });
     if (!goal) throw new NotFoundException('Goal not found');
     if (goal.userId !== userId) throw new ForbiddenException();
-    return this.prisma.savingsGoal.update({
+    const updated = await this.prisma.savingsGoal.update({
       where: { id },
       data: { currentAmount: { increment: amount } },
     });
+    await this.prisma.auditLog.create({
+      data: { userId, action: 'goal.contribute', entity: 'savings_goal', entityId: id, before: goal as any, after: updated as any },
+    });
+    if (updated.currentAmount >= updated.targetAmount) {
+      this.push.notify(userId, 'Goal reached! 🎉', `You've reached your "${updated.name}" savings goal.`).catch(() => {});
+    }
+    return updated;
   }
 
   async remove(userId: string, id: string) {
     const goal = await this.prisma.savingsGoal.findUnique({ where: { id } });
     if (!goal) throw new NotFoundException('Goal not found');
     if (goal.userId !== userId) throw new ForbiddenException();
+    await this.prisma.auditLog.create({
+      data: { userId, action: 'goal.delete', entity: 'savings_goal', entityId: id, before: goal as any },
+    });
     return this.prisma.savingsGoal.delete({ where: { id } });
   }
 }

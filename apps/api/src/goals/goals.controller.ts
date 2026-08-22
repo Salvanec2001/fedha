@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../common/current-user.decorator';
 import { GoalsService } from './goals.service';
@@ -16,6 +16,11 @@ export class GoalsController {
   @Get()
   findAll(@CurrentUser() user: { userId: string }) {
     return this.goalsService.findAllForUser(user.userId);
+  }
+
+  @Patch(':id')
+  update(@CurrentUser() user: { userId: string }, @Param('id') id: string, @Body() dto: any) {
+    return this.goalsService.update(user.userId, id, dto);
   }
 
   @Post(':id/contribute')
