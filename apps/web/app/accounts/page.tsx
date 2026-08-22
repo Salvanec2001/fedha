@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import NavBar from '../../components/NavBar';
+import Footer from '../../components/Footer';
 import { apiFetch, formatMoney, getToken } from '../../lib/api';
 
 type Account = {
@@ -72,9 +73,9 @@ export default function AccountsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-gray-50 flex flex-col">
       <NavBar />
-      <div className="max-w-3xl mx-auto px-6 py-8">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8 flex-1 w-full">
         <h1 className="text-2xl font-bold text-fedha-navy mb-6">Accounts</h1>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-xl border p-6 shadow-sm mb-8">
@@ -150,6 +151,7 @@ export default function AccountsPage() {
           ))}
         </div>
       </div>
+      <Footer />
     </main>
   );
 }
