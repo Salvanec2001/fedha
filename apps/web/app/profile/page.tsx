@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import NavBar from '../../components/NavBar';
+import Footer from '../../components/Footer';
 import { apiFetch, getToken } from '../../lib/api';
 
 type Profile = {
@@ -90,9 +91,9 @@ export default function ProfilePage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-gray-50 flex flex-col">
       <NavBar />
-      <div className="max-w-md mx-auto px-6 py-8">
+      <div className="max-w-md mx-auto px-4 sm:px-6 py-6 sm:py-8 flex-1 w-full">
         <h1 className="text-2xl font-bold text-fedha-navy mb-6">Profile</h1>
 
         {error && <p className="text-fedha-red text-sm mb-3">{error}</p>}
@@ -166,6 +167,7 @@ export default function ProfilePage() {
           </div>
         )}
       </div>
+      <Footer />
     </main>
   );
 }
