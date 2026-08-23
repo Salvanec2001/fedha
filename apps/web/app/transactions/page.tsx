@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation';
 import NavBar from '../../components/NavBar';
 import Footer from '../../components/Footer';
 import { apiFetch, formatMoney, getToken } from '../../lib/api';
+import { categoryStyle } from '../../lib/category-icons';
 
 type Account = { id: string; name: string; currency: string };
+type Category = { id: string; name: string; group: string };
 type Transaction = {
   id: string;
   type: 'INCOME' | 'EXPENSE' | 'TRANSFER';
@@ -21,21 +23,22 @@ type Transaction = {
   category?: { name: string } | null;
 };
 
-const TRANSFER_DESTINATION = { INTERNAL: 'internal', EXTERNAL: 'external' } as const;
-
 export default function TransactionsPage() {
   const router = useRouter();
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [type, setType] = useState<'INCOME' | 'EXPENSE' | 'TRANSFER'>('EXPENSE');
   const [accountId, setAccountId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
   const [transferDestination, setTransferDestination] = useState<'internal' | 'external'>('internal');
   const [toAccountId, setToAccountId] = useState('');
   const [externalRecipientName, setExternalRecipientName] = useState('');
   const [externalRecipientAccountNumber, setExternalRecipientAccountNumber] = useState('');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
-  const [occurredAt, setOccurredAt] = useState(() => new Date().toISOString().slice(0, 10));
+  const [occurredDate, setOccurredDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [occurredTime, setOccurredTime] = useState(() => new Date().toTimeString().slice(0, 5));
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -44,11 +47,16 @@ export default function TransactionsPage() {
   const [filterFrom, setFilterFrom] = useState('');
   const [filterTo, setFilterTo] = useState('');
 
+  const relevantCategories = categories.filter((c) =>
+    type === 'INCOME' ? c.group === 'INCOME' : c.group !== 'INCOME',
+  );
+
   function load(filters?: { search?: string; type?: string; from?: string; to?: string }) {
     apiFetch('/accounts').then((accs) => {
       setAccounts(accs);
       if (accs.length && !accountId) setAccountId(accs[0].id);
     });
+    apiFetch('/categories').then(setCategories).catch(() => {});
     const params = new URLSearchParams();
     if (filters?.search) params.set('search', filters.search);
     if (filters?.type) params.set('type', filters.type);
@@ -78,11 +86,13 @@ export default function TransactionsPage() {
     setSubmitting(true);
     try {
       const majorUnits = parseFloat(amount || '0');
+      const occurredAt = new Date(`${occurredDate}T${occurredTime}:00`).toISOString();
       await apiFetch('/transactions', {
         method: 'POST',
         body: JSON.stringify({
           type,
           accountId,
+          categoryId: type !== 'TRANSFER' ? categoryId || undefined : undefined,
           toAccountId: type === 'TRANSFER' && transferDestination === 'internal' ? toAccountId : undefined,
           externalRecipientName:
             type === 'TRANSFER' && transferDestination === 'external' ? externalRecipientName : undefined,
@@ -91,12 +101,13 @@ export default function TransactionsPage() {
               ? externalRecipientAccountNumber || undefined
               : undefined,
           amount: Math.round(majorUnits * 100),
-          occurredAt: new Date(occurredAt).toISOString(),
+          occurredAt,
           description: description || undefined,
         }),
       });
       setAmount('');
       setDescription('');
+      setCategoryId('');
       setExternalRecipientName('');
       setExternalRecipientAccountNumber('');
       load({ search, type: filterType, from: filterFrom, to: filterTo });
@@ -127,7 +138,7 @@ export default function TransactionsPage() {
               <button
                 type="button"
                 key={t}
-                onClick={() => setType(t)}
+                onClick={() => { setType(t); setCategoryId(''); }}
                 className={`px-4 py-2 rounded-lg text-sm font-medium border ${
                   type === t ? 'bg-fedha-navy text-white border-fedha-navy' : 'text-gray-600'
                 }`}
@@ -234,8 +245,18 @@ export default function TransactionsPage() {
               <label className="block text-sm font-medium mb-1">Date</label>
               <input
                 type="date"
-                value={occurredAt}
-                onChange={(e) => setOccurredAt(e.target.value)}
+                value={occurredDate}
+                onChange={(e) => setOccurredDate(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-fedha-navy"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Time</label>
+              <input
+                type="time"
+                value={occurredTime}
+                onChange={(e) => setOccurredTime(e.target.value)}
                 className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-fedha-navy"
               />
             </div>
@@ -249,6 +270,38 @@ export default function TransactionsPage() {
               />
             </div>
           </div>
+
+          {type !== 'TRANSFER' && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Category</label>
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-3">
+                {relevantCategories.map((c) => {
+                  const style = categoryStyle(c.name);
+                  const selected = categoryId === c.id;
+                  return (
+                    <button
+                      type="button"
+                      key={c.id}
+                      onClick={() => setCategoryId(selected ? '' : c.id)}
+                      className="flex flex-col items-center gap-1"
+                    >
+                      <span
+                        className="w-11 h-11 rounded-full flex items-center justify-center text-lg transition"
+                        style={{
+                          backgroundColor: selected ? style.bg : `${style.bg}22`,
+                          outline: selected ? `2px solid ${style.bg}` : 'none',
+                          outlineOffset: '2px',
+                        }}
+                      >
+                        {style.icon}
+                      </span>
+                      <span className="text-[10px] text-gray-600 text-center leading-tight">{c.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <button
             type="submit"
@@ -293,33 +346,44 @@ export default function TransactionsPage() {
 
         <div className="bg-white rounded-xl border shadow-sm divide-y">
           {transactions.length === 0 && <p className="p-5 text-gray-500">No transactions found.</p>}
-          {transactions.map((t) => (
-            <div key={t.id} className="p-4 flex justify-between items-center">
-              <div>
-                <p className="font-medium text-fedha-navy">
-                  {t.description || t.externalRecipientName || t.category?.name || t.type}
-                </p>
-                <p className="text-xs text-gray-400">
-                  {new Date(t.occurredAt).toLocaleDateString()} · {t.account.name}
-                  {t.toAccount ? ` → ${t.toAccount.name}` : ''}
-                  {t.externalRecipientName ? ` → ${t.externalRecipientName}${t.externalRecipientAccountNumber ? ` (${t.externalRecipientAccountNumber})` : ''}` : ''}
-                </p>
+          {transactions.map((t) => {
+            const style = t.category ? categoryStyle(t.category.name) : null;
+            return (
+              <div key={t.id} className="p-4 flex items-center gap-3">
+                {style && (
+                  <span
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0"
+                    style={{ backgroundColor: `${style.bg}22` }}
+                  >
+                    {style.icon}
+                  </span>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-fedha-navy truncate">
+                    {t.description || t.externalRecipientName || t.category?.name || t.type}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {new Date(t.occurredAt).toLocaleString()} · {t.account.name}
+                    {t.toAccount ? ` → ${t.toAccount.name}` : ''}
+                    {t.externalRecipientName ? ` → ${t.externalRecipientName}${t.externalRecipientAccountNumber ? ` (${t.externalRecipientAccountNumber})` : ''}` : ''}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <p
+                    className={`font-semibold ${
+                      t.type === 'INCOME' ? 'text-fedha-green' : t.type === 'EXPENSE' ? 'text-fedha-red' : 'text-fedha-navy'
+                    }`}
+                  >
+                    {t.type === 'EXPENSE' ? '−' : t.type === 'INCOME' ? '+' : ''}
+                    {formatMoney(t.amount, t.currency)}
+                  </p>
+                  <button onClick={() => handleVoid(t.id)} className="text-xs text-gray-400 hover:text-fedha-red">
+                    Void
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <p
-                  className={`font-semibold ${
-                    t.type === 'INCOME' ? 'text-fedha-green' : t.type === 'EXPENSE' ? 'text-fedha-red' : 'text-fedha-navy'
-                  }`}
-                >
-                  {t.type === 'EXPENSE' ? '−' : t.type === 'INCOME' ? '+' : ''}
-                  {formatMoney(t.amount, t.currency)}
-                </p>
-                <button onClick={() => handleVoid(t.id)} className="text-xs text-gray-400 hover:text-fedha-red">
-                  Void
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
       <Footer />
