@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import NavBar from '../../components/NavBar';
 import Footer from '../../components/Footer';
 import { apiFetch, apiDownload, formatMoney, getToken } from '../../lib/api';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { categoryStyle } from '../../lib/category-icons';
 
 type Report = {
   currency: string;
@@ -115,6 +117,28 @@ export default function ReportsPage() {
                 <p className="text-lg font-bold text-fedha-navy">{report.savingsRate.toFixed(1)}%</p>
               </div>
             </div>
+
+            {report.categoryBreakdown.length > 0 && (
+              <div className="bg-white rounded-xl border shadow-sm p-4 mb-6">
+                <p className="text-sm font-semibold text-fedha-navy mb-3">Spending by category</p>
+                <ResponsiveContainer width="100%" height={Math.max(160, report.categoryBreakdown.length * 36)}>
+                  <BarChart
+                    data={report.categoryBreakdown.map((c) => ({ name: c.name, value: c.total / 100 }))}
+                    layout="vertical"
+                    margin={{ left: 8, right: 16 }}
+                  >
+                    <XAxis type="number" hide />
+                    <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11 }} />
+                    <Tooltip formatter={(v: number) => formatMoney(v * 100, report.currency)} />
+                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                      {report.categoryBreakdown.map((c, i) => (
+                        <Cell key={i} fill={categoryStyle(c.name).bg} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
 
             <h2 className="text-lg font-semibold text-fedha-navy mb-3">Expenses by Category</h2>
             <div className="bg-white rounded-xl border shadow-sm divide-y">
