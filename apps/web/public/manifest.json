@@ -1,0 +1,14 @@
+{
+  "name": "Fedha — Your Money. Your Plan. Your Future.",
+  "short_name": "Fedha",
+  "description": "Fedha is a professional personal financial management platform for tracking money, managing budgets, building savings, managing debt, and making smarter financial decisions.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#F5F6F8",
+  "theme_color": "#0B1F3A",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -1,3 +1,8 @@
+// Minimal pass-through fetch handler — required by Chrome for the app to be
+// considered "installable" as a PWA. No offline caching yet (keeps behavior
+// identical to a normal page load); can be extended later.
+self.addEventListener('fetch', () => {});
+
 self.addEventListener('push', (event) => {
   const data = event.data ? event.data.json() : { title: 'Fedha', body: 'You have a new notification.' };
   event.waitUntil(
