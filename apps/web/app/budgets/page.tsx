@@ -16,6 +16,8 @@ export default function BudgetsPage() {
   const [period, setPeriod] = useState('MONTHLY');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editAmount, setEditAmount] = useState('');
 
   function load() {
     apiFetch('/budgets').then(setBudgets).catch((err) => setError(err.message));
@@ -47,7 +49,17 @@ export default function BudgetsPage() {
   }
 
   async function remove(id: string) {
+    if (!confirm('Delete this budget?')) return;
     await apiFetch(`/budgets/${id}`, { method: 'DELETE' });
+    load();
+  }
+
+  async function saveEdit(id: string) {
+    await apiFetch(`/budgets/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ amount: Math.round(parseFloat(editAmount || '0') * 100) }),
+    });
+    setEditingId(null);
     load();
   }
 
@@ -90,8 +102,27 @@ export default function BudgetsPage() {
                   <p className="text-xs text-gray-400">{b.period}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-semibold">{formatMoney(b.spent)} / {formatMoney(b.amount)}</p>
-                  <button onClick={() => remove(b.id)} className="text-xs text-gray-400 hover:text-fedha-red">Remove</button>
+                  {editingId === b.id ? (
+                    <div className="flex gap-1 items-center">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={editAmount}
+                        onChange={(e) => setEditAmount(e.target.value)}
+                        className="w-24 px-2 py-1 border rounded text-xs"
+                      />
+                      <button onClick={() => saveEdit(b.id)} className="text-xs text-fedha-navy font-medium">Save</button>
+                      <button onClick={() => setEditingId(null)} className="text-xs text-gray-400">Cancel</button>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm font-semibold">{formatMoney(b.spent)} / {formatMoney(b.amount)}</p>
+                      <div className="flex gap-2 justify-end">
+                        <button onClick={() => { setEditingId(b.id); setEditAmount((b.amount / 100).toString()); }} className="text-xs text-gray-400 hover:text-fedha-navy">Edit</button>
+                        <button onClick={() => remove(b.id)} className="text-xs text-gray-400 hover:text-fedha-red">Remove</button>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">

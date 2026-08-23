@@ -64,6 +64,7 @@ export default function GoalsPage() {
   }
 
   async function remove(id: string) {
+    if (!confirm('Delete this goal?')) return;
     await apiFetch(`/goals/${id}`, { method: 'DELETE' });
     load();
   }

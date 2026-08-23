@@ -33,6 +33,9 @@ export default function AccountsPage() {
   const [openingBalance, setOpeningBalance] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editInstitution, setEditInstitution] = useState('');
 
   function load() {
     apiFetch('/accounts').then(setAccounts).catch((err) => setError(err.message));
@@ -70,6 +73,27 @@ export default function AccountsPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function startEdit(a: Account) {
+    setEditingId(a.id);
+    setEditName(a.name);
+    setEditInstitution(a.institution ?? '');
+  }
+
+  async function saveEdit(id: string) {
+    await apiFetch(`/accounts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name: editName, institution: editInstitution || undefined }),
+    });
+    setEditingId(null);
+    load();
+  }
+
+  async function removeAccount(id: string) {
+    if (!confirm('Remove this account? Its transaction history will be kept.')) return;
+    await apiFetch(`/accounts/${id}`, { method: 'DELETE' });
+    load();
   }
 
   return (
@@ -139,14 +163,31 @@ export default function AccountsPage() {
         <div className="bg-white rounded-xl border shadow-sm divide-y">
           {accounts.length === 0 && <p className="p-5 text-gray-500">No accounts yet.</p>}
           {accounts.map((a) => (
-            <div key={a.id} className="p-4 flex justify-between items-center">
-              <div>
-                <p className="font-medium text-fedha-navy">{a.name}</p>
-                <p className="text-xs text-gray-400">
-                  {a.type.replace('_', ' ')}{a.institution ? ` · ${a.institution}` : ''}
-                </p>
-              </div>
-              <p className="font-semibold">{formatMoney(a.currentBalance, a.currency)}</p>
+            <div key={a.id} className="p-4">
+              {editingId === a.id ? (
+                <div className="space-y-2">
+                  <input value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="Name" />
+                  <input value={editInstitution} onChange={(e) => setEditInstitution(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="Institution" />
+                  <div className="flex gap-2">
+                    <button onClick={() => saveEdit(a.id)} className="px-3 py-1.5 rounded-lg bg-fedha-navy text-white text-xs font-medium">Save</button>
+                    <button onClick={() => setEditingId(null)} className="px-3 py-1.5 rounded-lg border text-xs font-medium">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="font-medium text-fedha-navy">{a.name}</p>
+                    <p className="text-xs text-gray-400">
+                      {a.type.replace('_', ' ')}{a.institution ? ` · ${a.institution}` : ''}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <p className="font-semibold">{formatMoney(a.currentBalance, a.currency)}</p>
+                    <button onClick={() => startEdit(a)} className="text-xs text-gray-400 hover:text-fedha-navy">Edit</button>
+                    <button onClick={() => removeAccount(a.id)} className="text-xs text-gray-400 hover:text-fedha-red">Remove</button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
