@@ -47,6 +47,31 @@ enum NotificationStatus {
   SKIPPED
 }
 
+enum BudgetPeriod {
+  WEEKLY
+  MONTHLY
+  ANNUAL
+}
+
+enum GoalPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum DebtStatus {
+  ACTIVE
+  PAID
+  OVERDUE
+}
+
+enum ReceivableStatus {
+  PENDING
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+}
+
 model User {
   id              String   @id @default(uuid())
   name            String
@@ -54,7 +79,7 @@ model User {
   passwordHash    String
   primaryCurrency String   @default("TZS")
   phone           String?
-  avatarUrl       String? @db.Text
+  avatarUrl       String?  @db.Text
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -66,15 +91,15 @@ model User {
   phoneVerificationCode    String?
   phoneVerificationExpires DateTime?
 
-  accounts      Account[]
-  categories    TransactionCategory[]
-  auditLogs     AuditLog[]
-  notifications Notification[]
-  budgets       Budget[]
-  savingsGoals  SavingsGoal[]
+  accounts          Account[]
+  categories        TransactionCategory[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  budgets           Budget[]
+  savingsGoals      SavingsGoal[]
   pushSubscriptions PushSubscription[]
-  debts         Debt[]
-  receivables   Receivable[]
+  debts             Debt[]
+  receivables       Receivable[]
 
   @@map("users")
 }
@@ -100,15 +125,15 @@ model Account {
 }
 
 model TransactionCategory {
-  id             String         @id @default(uuid())
-  userId         String
-  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parentId       String?
-  parent         TransactionCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children       TransactionCategory[] @relation("CategoryHierarchy")
-  name           String
-  group          CategoryGroup
-  isCustom       Boolean        @default(false)
+  id       String                @id @default(uuid())
+  userId   String
+  user     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentId String?
+  parent   TransactionCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children TransactionCategory[] @relation("CategoryHierarchy")
+  name     String
+  group    CategoryGroup
+  isCustom Boolean               @default(false)
 
   transactions Transaction[]
   budgets      Budget[]
@@ -118,29 +143,29 @@ model TransactionCategory {
 }
 
 model Transaction {
-  id                    String          @id @default(uuid())
-  type                  TransactionType
-  amount                Int
-  currency              String          @default("TZS")
-  occurredAt            DateTime
-  description            String?
-  counterparty           String?
+  id          String          @id @default(uuid())
+  type        TransactionType
+  amount      Int
+  currency    String          @default("TZS")
+  occurredAt  DateTime
+  description String?
+  counterparty String?
 
-  accountId              String
-  account                 Account @relation("SourceAccount", fields: [accountId], references: [id])
-  toAccountId            String?
-  toAccount               Account? @relation("DestinationAccount", fields: [toAccountId], references: [id])
+  accountId                      String
+  account                        Account  @relation("SourceAccount", fields: [accountId], references: [id])
+  toAccountId                    String?
+  toAccount                      Account? @relation("DestinationAccount", fields: [toAccountId], references: [id])
   externalRecipientName          String?
   externalRecipientAccountNumber String?
 
-  categoryId             String?
-  category               TransactionCategory? @relation(fields: [categoryId], references: [id])
+  categoryId String?
+  category   TransactionCategory? @relation(fields: [categoryId], references: [id])
 
-  isRecurringInstance    Boolean @default(false)
+  isRecurringInstance Boolean @default(false)
 
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
-  deletedAt              DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([accountId])
   @@index([occurredAt])
@@ -181,28 +206,16 @@ model Notification {
   @@map("notifications")
 }
 
-enum BudgetPeriod {
-  WEEKLY
-  MONTHLY
-  ANNUAL
-}
-
-enum GoalPriority {
-  LOW
-  MEDIUM
-  HIGH
-}
-
 model Budget {
-  id         String       @id @default(uuid())
+  id         String                @id @default(uuid())
   userId     String
-  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   categoryId String?
-  category   TransactionCategory? @relation(fields: [categoryId], references: [id])
+  category   TransactionCategory?  @relation(fields: [categoryId], references: [id])
   name       String
-  period     BudgetPeriod @default(MONTHLY)
+  period     BudgetPeriod          @default(MONTHLY)
   amount     Int
-  createdAt  DateTime     @default(now())
+  createdAt  DateTime              @default(now())
 
   @@index([userId])
   @@map("budgets")
@@ -238,19 +251,9 @@ model PushSubscription {
   @@map("push_subscriptions")
 }
 
-enum DebtStatus {
-  ACTIVE
-  PAID
-  OVERDUE
-}
-
-enum ReceivableStatus {
-  PENDING
-  PARTIALLY_PAID
-  PAID
-  OVERDUE
-}
-
+// Money the user owes to someone else. Deliberately isolated from the
+// Transaction ledger — a debt payment is tracked here, not as a normal
+// expense, so it is never miscounted in income/expense totals.
 model Debt {
   id               String     @id @default(uuid())
   userId           String
@@ -283,6 +286,7 @@ model DebtPayment {
   @@map("debt_payments")
 }
 
+// Money someone else owes the user. Same isolation principle as Debt.
 model Receivable {
   id                    String           @id @default(uuid())
   userId                String
@@ -303,11 +307,11 @@ model Receivable {
 }
 
 model ReceivablePayment {
-  id           String   @id @default(uuid())
+  id           String     @id @default(uuid())
   receivableId String
   receivable   Receivable @relation(fields: [receivableId], references: [id], onDelete: Cascade)
   amount       Int
-  paidAt       DateTime @default(now())
+  paidAt       DateTime   @default(now())
   notes        String?
 
   @@index([receivableId])

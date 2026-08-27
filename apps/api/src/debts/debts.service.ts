@@ -10,6 +10,12 @@ export class DebtsService {
     private readonly push: PushService,
   ) {}
 
+  private computeStatus(remainingBalance: number, dueDate: Date | null): 'ACTIVE' | 'PAID' | 'OVERDUE' {
+    if (remainingBalance <= 0) return 'PAID';
+    if (dueDate && dueDate < new Date()) return 'OVERDUE';
+    return 'ACTIVE';
+  }
+
   async create(userId: string, dto: { creditorName: string; principal: number; interestRate?: number; dueDate?: string; notes?: string }) {
     const debt = await this.prisma.debt.create({
       data: {
@@ -18,21 +24,15 @@ export class DebtsService {
         principal: dto.principal,
         remainingBalance: dto.principal,
         interestRate: dto.interestRate,
-        dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+        dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
         notes: dto.notes,
       },
     });
     await this.prisma.auditLog.create({
       data: { userId, action: 'debt.create', entity: 'debt', entityId: debt.id, after: debt as any },
     });
-    this.push.notify(userId, 'Debt recorded', `${dto.creditorName}: ${formatMoney(dto.principal)}`).catch(() => {});
+    this.push.notify(userId, 'Debt recorded', `You recorded owing ${formatMoney(debt.principal)} to ${debt.creditorName}.`).catch(() => {});
     return debt;
-  }
-
-  private withComputedStatus<T extends { dueDate: Date | null; remainingBalance: number; status: string }>(item: T): T {
-    if (item.remainingBalance <= 0) return { ...item, status: 'PAID' };
-    if (item.dueDate && item.dueDate < new Date()) return { ...item, status: 'OVERDUE' };
-    return { ...item, status: item.status === 'PAID' ? 'ACTIVE' : item.status };
   }
 
   async findAllForUser(userId: string) {
@@ -41,18 +41,55 @@ export class DebtsService {
       include: { payments: { orderBy: { paidAt: 'desc' } } },
       orderBy: { createdAt: 'desc' },
     });
-    return debts.map((d) => this.withComputedStatus(d));
+
+    const results = [];
+    for (const d of debts) {
+      const status = this.computeStatus(d.remainingBalance, d.dueDate);
+      if (status !== d.status) {
+        await this.prisma.debt.update({ where: { id: d.id }, data: { status } });
+      }
+      results.push({ ...d, status });
+    }
+    return results;
   }
 
-  private async findOwned(userId: string, id: string) {
-    const debt = await this.prisma.debt.findUnique({ where: { id } });
+  async addPayment(userId: string, debtId: string, amount: number, notes?: string) {
+    const debt = await this.prisma.debt.findUnique({ where: { id: debtId } });
     if (!debt) throw new NotFoundException('Debt not found');
     if (debt.userId !== userId) throw new ForbiddenException();
-    return debt;
+    if (amount <= 0) throw new BadRequestException('Payment amount must be positive');
+    if (amount > debt.remainingBalance) {
+      throw new BadRequestException('Payment cannot exceed the remaining balance');
+    }
+
+    const [payment, updated] = await this.prisma.$transaction([
+      this.prisma.debtPayment.create({ data: { debtId, amount, notes } }),
+      this.prisma.debt.update({
+        where: { id: debtId },
+        data: { remainingBalance: { decrement: amount } },
+      }),
+    ]);
+
+    const finalStatus = this.computeStatus(updated.remainingBalance, updated.dueDate);
+    if (finalStatus !== updated.status) {
+      await this.prisma.debt.update({ where: { id: debtId }, data: { status: finalStatus } });
+    }
+
+    await this.prisma.auditLog.create({
+      data: { userId, action: 'debt.payment', entity: 'debt', entityId: debtId, after: payment as any },
+    });
+
+    if (finalStatus === 'PAID') {
+      this.push.notify(userId, 'Debt paid off! 🎉', `You've fully paid off your debt to ${debt.creditorName}.`).catch(() => {});
+    }
+
+    return { payment, remainingBalance: updated.remainingBalance, status: finalStatus };
   }
 
   async update(userId: string, id: string, dto: { creditorName?: string; dueDate?: string; interestRate?: number; notes?: string }) {
-    const existing = await this.findOwned(userId, id);
+    const existing = await this.prisma.debt.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Debt not found');
+    if (existing.userId !== userId) throw new ForbiddenException();
     const updated = await this.prisma.debt.update({
       where: { id },
       data: {
@@ -68,39 +105,10 @@ export class DebtsService {
     return updated;
   }
 
-  async addPayment(userId: string, id: string, amount: number, notes?: string) {
-    const debt = await this.findOwned(userId, id);
-    if (amount <= 0) throw new BadRequestException('Payment amount must be positive');
-    if (amount > debt.remainingBalance) {
-      throw new BadRequestException('Payment cannot exceed the remaining balance');
-    }
-
-    const [payment, updated] = await this.prisma.$transaction([
-      this.prisma.debtPayment.create({ data: { debtId: id, amount, notes } }),
-      this.prisma.debt.update({
-        where: { id },
-        data: {
-          remainingBalance: { decrement: amount },
-          status: debt.remainingBalance - amount <= 0 ? 'PAID' : 'ACTIVE',
-        },
-      }),
-    ]);
-
-    await this.prisma.auditLog.create({
-      data: { userId, action: 'debt.payment', entity: 'debt', entityId: id, after: payment as any },
-    });
-
-    if (updated.remainingBalance <= 0) {
-      this.push.notify(userId, 'Debt paid off! 🎉', `You've fully paid off your debt to ${debt.creditorName}.`).catch(() => {});
-    } else {
-      this.push.notify(userId, 'Debt payment recorded', `${formatMoney(amount)} paid toward ${debt.creditorName}.`).catch(() => {});
-    }
-
-    return updated;
-  }
-
   async remove(userId: string, id: string) {
-    const debt = await this.findOwned(userId, id);
+    const debt = await this.prisma.debt.findUnique({ where: { id } });
+    if (!debt) throw new NotFoundException('Debt not found');
+    if (debt.userId !== userId) throw new ForbiddenException();
     await this.prisma.auditLog.create({
       data: { userId, action: 'debt.delete', entity: 'debt', entityId: id, before: debt as any },
     });
