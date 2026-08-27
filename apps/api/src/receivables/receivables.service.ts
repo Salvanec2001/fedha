@@ -10,6 +10,17 @@ export class ReceivablesService {
     private readonly push: PushService,
   ) {}
 
+  private computeStatus(
+    amount: number,
+    remainingBalance: number,
+    expectedRepaymentDate: Date | null,
+  ): 'PENDING' | 'PARTIALLY_PAID' | 'PAID' | 'OVERDUE' {
+    if (remainingBalance <= 0) return 'PAID';
+    if (expectedRepaymentDate && expectedRepaymentDate < new Date()) return 'OVERDUE';
+    if (remainingBalance < amount) return 'PARTIALLY_PAID';
+    return 'PENDING';
+  }
+
   async create(userId: string, dto: { debtorName: string; amount: number; expectedRepaymentDate?: string; notes?: string }) {
     const receivable = await this.prisma.receivable.create({
       data: {
@@ -17,22 +28,15 @@ export class ReceivablesService {
         debtorName: dto.debtorName,
         amount: dto.amount,
         remainingBalance: dto.amount,
-        expectedRepaymentDate: dto.expectedRepaymentDate ? new Date(dto.expectedRepaymentDate) : undefined,
+        expectedRepaymentDate: dto.expectedRepaymentDate ? new Date(dto.expectedRepaymentDate) : null,
         notes: dto.notes,
       },
     });
     await this.prisma.auditLog.create({
       data: { userId, action: 'receivable.create', entity: 'receivable', entityId: receivable.id, after: receivable as any },
     });
-    this.push.notify(userId, 'Receivable recorded', `${dto.debtorName} owes you ${formatMoney(dto.amount)}.`).catch(() => {});
+    this.push.notify(userId, 'Receivable recorded', `You recorded ${dto.debtorName} owing you ${formatMoney(receivable.amount)}.`).catch(() => {});
     return receivable;
-  }
-
-  private withComputedStatus<T extends { expectedRepaymentDate: Date | null; remainingBalance: number; amount: number; status: string }>(item: T): T {
-    if (item.remainingBalance <= 0) return { ...item, status: 'PAID' };
-    if (item.expectedRepaymentDate && item.expectedRepaymentDate < new Date()) return { ...item, status: 'OVERDUE' };
-    if (item.remainingBalance < item.amount) return { ...item, status: 'PARTIALLY_PAID' };
-    return { ...item, status: item.status === 'PAID' ? 'PENDING' : item.status };
   }
 
   async findAllForUser(userId: string) {
@@ -41,18 +45,55 @@ export class ReceivablesService {
       include: { payments: { orderBy: { paidAt: 'desc' } } },
       orderBy: { createdAt: 'desc' },
     });
-    return receivables.map((r) => this.withComputedStatus(r));
+
+    const results = [];
+    for (const r of receivables) {
+      const status = this.computeStatus(r.amount, r.remainingBalance, r.expectedRepaymentDate);
+      if (status !== r.status) {
+        await this.prisma.receivable.update({ where: { id: r.id }, data: { status } });
+      }
+      results.push({ ...r, status });
+    }
+    return results;
   }
 
-  private async findOwned(userId: string, id: string) {
-    const receivable = await this.prisma.receivable.findUnique({ where: { id } });
+  async addPayment(userId: string, receivableId: string, amount: number, notes?: string) {
+    const receivable = await this.prisma.receivable.findUnique({ where: { id: receivableId } });
     if (!receivable) throw new NotFoundException('Receivable not found');
     if (receivable.userId !== userId) throw new ForbiddenException();
-    return receivable;
+    if (amount <= 0) throw new BadRequestException('Payment amount must be positive');
+    if (amount > receivable.remainingBalance) {
+      throw new BadRequestException('Payment cannot exceed the remaining balance');
+    }
+
+    const [payment, updated] = await this.prisma.$transaction([
+      this.prisma.receivablePayment.create({ data: { receivableId, amount, notes } }),
+      this.prisma.receivable.update({
+        where: { id: receivableId },
+        data: { remainingBalance: { decrement: amount } },
+      }),
+    ]);
+
+    const finalStatus = this.computeStatus(updated.amount, updated.remainingBalance, updated.expectedRepaymentDate);
+    if (finalStatus !== updated.status) {
+      await this.prisma.receivable.update({ where: { id: receivableId }, data: { status: finalStatus } });
+    }
+
+    await this.prisma.auditLog.create({
+      data: { userId, action: 'receivable.payment', entity: 'receivable', entityId: receivableId, after: payment as any },
+    });
+
+    if (finalStatus === 'PAID') {
+      this.push.notify(userId, 'Receivable fully repaid', `${receivable.debtorName} has fully repaid you.`).catch(() => {});
+    }
+
+    return { payment, remainingBalance: updated.remainingBalance, status: finalStatus };
   }
 
   async update(userId: string, id: string, dto: { debtorName?: string; expectedRepaymentDate?: string; notes?: string }) {
-    const existing = await this.findOwned(userId, id);
+    const existing = await this.prisma.receivable.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Receivable not found');
+    if (existing.userId !== userId) throw new ForbiddenException();
     const updated = await this.prisma.receivable.update({
       where: { id },
       data: {
@@ -67,40 +108,10 @@ export class ReceivablesService {
     return updated;
   }
 
-  async addPayment(userId: string, id: string, amount: number, notes?: string) {
-    const receivable = await this.findOwned(userId, id);
-    if (amount <= 0) throw new BadRequestException('Payment amount must be positive');
-    if (amount > receivable.remainingBalance) {
-      throw new BadRequestException('Payment cannot exceed the remaining balance');
-    }
-
-    const newRemaining = receivable.remainingBalance - amount;
-    const [payment, updated] = await this.prisma.$transaction([
-      this.prisma.receivablePayment.create({ data: { receivableId: id, amount, notes } }),
-      this.prisma.receivable.update({
-        where: { id },
-        data: {
-          remainingBalance: { decrement: amount },
-          status: newRemaining <= 0 ? 'PAID' : 'PARTIALLY_PAID',
-        },
-      }),
-    ]);
-
-    await this.prisma.auditLog.create({
-      data: { userId, action: 'receivable.payment', entity: 'receivable', entityId: id, after: payment as any },
-    });
-
-    if (updated.remainingBalance <= 0) {
-      this.push.notify(userId, 'Fully repaid! 🎉', `${receivable.debtorName} has fully repaid you.`).catch(() => {});
-    } else {
-      this.push.notify(userId, 'Repayment received', `${formatMoney(amount)} received from ${receivable.debtorName}.`).catch(() => {});
-    }
-
-    return updated;
-  }
-
   async remove(userId: string, id: string) {
-    const receivable = await this.findOwned(userId, id);
+    const receivable = await this.prisma.receivable.findUnique({ where: { id } });
+    if (!receivable) throw new NotFoundException('Receivable not found');
+    if (receivable.userId !== userId) throw new ForbiddenException();
     await this.prisma.auditLog.create({
       data: { userId, action: 'receivable.delete', entity: 'receivable', entityId: id, before: receivable as any },
     });
