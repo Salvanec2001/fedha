@@ -100,6 +100,7 @@ model User {
   pushSubscriptions PushSubscription[]
   debts             Debt[]
   receivables       Receivable[]
+  recurringTransactions RecurringTransaction[]
 
   @@map("users")
 }
@@ -119,6 +120,7 @@ model Account {
 
   transactionsFrom Transaction[] @relation("SourceAccount")
   transactionsTo   Transaction[] @relation("DestinationAccount")
+  recurringTransactions RecurringTransaction[]
 
   @@index([userId])
   @@map("accounts")
@@ -137,6 +139,7 @@ model TransactionCategory {
 
   transactions Transaction[]
   budgets      Budget[]
+  recurringTransactions RecurringTransaction[]
 
   @@index([userId])
   @@map("transaction_categories")
@@ -316,4 +319,40 @@ model ReceivablePayment {
 
   @@index([receivableId])
   @@map("receivable_payments")
+}
+
+enum RecurrenceFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+// A template that the recurring-transactions scheduler uses to generate
+// real Transaction rows on schedule. Generated transactions are ordinary
+// rows in the ledger (isRecurringInstance: true) created via the same
+// TransactionsService.create() used everywhere else — there is only one
+// place balances get updated, never a separate calculation path here.
+model RecurringTransaction {
+  id         String              @id @default(uuid())
+  userId     String
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  type       TransactionType
+  amount     Int
+  accountId  String
+  account    Account             @relation(fields: [accountId], references: [id])
+  categoryId String?
+  category   TransactionCategory? @relation(fields: [categoryId], references: [id])
+  frequency  RecurrenceFrequency
+  startDate  DateTime
+  endDate    DateTime?
+  nextRunAt  DateTime
+  isActive   Boolean             @default(true)
+  notes      String?
+  createdAt  DateTime            @default(now())
+
+  @@index([userId])
+  @@index([nextRunAt])
+  @@map("recurring_transactions")
 }

@@ -15,6 +15,7 @@ import { ActivityModule } from './activity/activity.module';
 import { CategoriesModule } from './categories/categories.module';
 import { DebtsModule } from './debts/debts.module';
 import { ReceivablesModule } from './receivables/receivables.module';
+import { RecurringModule } from './recurring/recurring.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { ReceivablesModule } from './receivables/receivables.module';
     CategoriesModule,
     DebtsModule,
     ReceivablesModule,
+    RecurringModule,
   ],
 })
 export class AppModule {}
