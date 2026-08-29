@@ -12,6 +12,7 @@ const LINKS = [
   { href: '/budgets', label: 'Budgets' },
   { href: '/goals', label: 'Savings Goals' },
   { href: '/debts', label: 'Debts & Receivables' },
+  { href: '/recurring', label: 'Recurring' },
   { href: '/reports', label: 'Reports' },
   { href: '/history', label: 'History' },
   { href: '/profile', label: 'Profile' },
