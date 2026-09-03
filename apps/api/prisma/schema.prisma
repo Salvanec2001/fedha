@@ -72,6 +72,13 @@ enum ReceivableStatus {
   OVERDUE
 }
 
+enum RecurrenceFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
 model User {
   id              String   @id @default(uuid())
   name            String
@@ -91,15 +98,18 @@ model User {
   phoneVerificationCode    String?
   phoneVerificationExpires DateTime?
 
-  accounts          Account[]
-  categories        TransactionCategory[]
-  auditLogs         AuditLog[]
-  notifications     Notification[]
-  budgets           Budget[]
-  savingsGoals      SavingsGoal[]
-  pushSubscriptions PushSubscription[]
-  debts             Debt[]
-  receivables       Receivable[]
+  passwordResetToken   String?
+  passwordResetExpires DateTime?
+
+  accounts              Account[]
+  categories            TransactionCategory[]
+  auditLogs             AuditLog[]
+  notifications         Notification[]
+  budgets               Budget[]
+  savingsGoals          SavingsGoal[]
+  pushSubscriptions     PushSubscription[]
+  debts                 Debt[]
+  receivables           Receivable[]
   recurringTransactions RecurringTransaction[]
 
   @@map("users")
@@ -118,8 +128,8 @@ model Account {
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
-  transactionsFrom Transaction[] @relation("SourceAccount")
-  transactionsTo   Transaction[] @relation("DestinationAccount")
+  transactionsFrom      Transaction[]           @relation("SourceAccount")
+  transactionsTo        Transaction[]           @relation("DestinationAccount")
   recurringTransactions RecurringTransaction[]
 
   @@index([userId])
@@ -136,9 +146,12 @@ model TransactionCategory {
   name     String
   group    CategoryGroup
   isCustom Boolean               @default(false)
+  icon     String?
+  color    String?
+  isArchived Boolean             @default(false)
 
-  transactions Transaction[]
-  budgets      Budget[]
+  transactions          Transaction[]
+  budgets               Budget[]
   recurringTransactions RecurringTransaction[]
 
   @@index([userId])
@@ -254,9 +267,6 @@ model PushSubscription {
   @@map("push_subscriptions")
 }
 
-// Money the user owes to someone else. Deliberately isolated from the
-// Transaction ledger — a debt payment is tracked here, not as a normal
-// expense, so it is never miscounted in income/expense totals.
 model Debt {
   id               String     @id @default(uuid())
   userId           String
@@ -289,7 +299,6 @@ model DebtPayment {
   @@map("debt_payments")
 }
 
-// Money someone else owes the user. Same isolation principle as Debt.
 model Receivable {
   id                    String           @id @default(uuid())
   userId                String
@@ -321,36 +330,24 @@ model ReceivablePayment {
   @@map("receivable_payments")
 }
 
-enum RecurrenceFrequency {
-  DAILY
-  WEEKLY
-  MONTHLY
-  YEARLY
-}
-
-// A template that the recurring-transactions scheduler uses to generate
-// real Transaction rows on schedule. Generated transactions are ordinary
-// rows in the ledger (isRecurringInstance: true) created via the same
-// TransactionsService.create() used everywhere else — there is only one
-// place balances get updated, never a separate calculation path here.
 model RecurringTransaction {
-  id         String              @id @default(uuid())
+  id         String               @id @default(uuid())
   userId     String
-  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   name       String
   type       TransactionType
   amount     Int
   accountId  String
-  account    Account             @relation(fields: [accountId], references: [id])
+  account    Account              @relation(fields: [accountId], references: [id])
   categoryId String?
   category   TransactionCategory? @relation(fields: [categoryId], references: [id])
   frequency  RecurrenceFrequency
   startDate  DateTime
   endDate    DateTime?
   nextRunAt  DateTime
-  isActive   Boolean             @default(true)
+  isActive   Boolean              @default(true)
   notes      String?
-  createdAt  DateTime            @default(now())
+  createdAt  DateTime             @default(now())
 
   @@index([userId])
   @@index([nextRunAt])
