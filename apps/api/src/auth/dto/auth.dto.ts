@@ -58,3 +58,17 @@ export class UpdateProfileDto {
   @IsString()
   avatarUrl?: string;
 }
+
+export class ForgotPasswordDto {
+  @IsEmail()
+  email: string;
+}
+
+export class ResetPasswordDto {
+  @IsString()
+  token: string;
+
+  @IsString()
+  @MinLength(8, { message: 'Password must be at least 8 characters' })
+  newPassword: string;
+}

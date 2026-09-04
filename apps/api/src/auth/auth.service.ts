@@ -4,12 +4,13 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { RegisterDto, LoginDto, RefreshDto, VerifyPhoneDto, UpdatePhoneDto, UpdateProfileDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, RefreshDto, VerifyPhoneDto, UpdatePhoneDto, UpdateProfileDto, ForgotPasswordDto, ResetPasswordDto } from './dto/auth.dto';
 import { DEFAULT_CATEGORIES } from '../../prisma/seed';
 
 const BCRYPT_ROUNDS = 12;
 const EMAIL_TOKEN_TTL_HOURS = 24;
 const PHONE_CODE_TTL_MINUTES = 10;
+const RESET_TOKEN_TTL_MINUTES = 30;
 
 @Injectable()
 export class AuthService {
@@ -55,8 +56,8 @@ export class AuthService {
         user.id,
         user.email,
         'email_verification',
-        'Verify your Fedha account',
-        `Hi ${user.name},\n\nWelcome to Fedha. Please verify your email by opening this link:\n${verifyUrl}\n\nThis link expires in ${EMAIL_TOKEN_TTL_HOURS} hours.`,
+        'Your Fedha account has been created',
+        `Hi ${user.name},\n\nYour Fedha account has been created successfully.\n\nPlease verify your email by opening this link:\n${verifyUrl}\n\nThis link expires in ${EMAIL_TOKEN_TTL_HOURS} hours.\n\n— Fedha, Your Money. Your Plan. Your Future.`,
       )
       .catch(() => {});
 
@@ -105,6 +106,51 @@ export class AuthService {
     });
 
     return { verified: true };
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    if (user) {
+      const token = crypto.randomBytes(32).toString('hex');
+      const expires = new Date(Date.now() + RESET_TOKEN_TTL_MINUTES * 60 * 1000);
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { passwordResetToken: token, passwordResetExpires: expires },
+      });
+      const resetUrl = `${process.env.WEB_ORIGIN}/reset-password?token=${token}`;
+      this.notifications
+        .sendEmail(
+          user.id,
+          user.email,
+          'password_reset',
+          'Reset your Fedha password',
+          `Hi ${user.name},\n\nWe received a request to reset your Fedha password. Open this link to choose a new one:\n${resetUrl}\n\nThis link expires in ${RESET_TOKEN_TTL_MINUTES} minutes. If you didn't request this, you can ignore this email.`,
+        )
+        .catch(() => {});
+    }
+    return { sent: true };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const user = await this.prisma.user.findFirst({ where: { passwordResetToken: dto.token } });
+    if (!user || !user.passwordResetExpires || user.passwordResetExpires < new Date()) {
+      throw new BadRequestException('Reset link is invalid or has expired');
+    }
+    const passwordHash = await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash, passwordResetToken: null, passwordResetExpires: null },
+    });
+    this.notifications
+      .sendEmail(
+        user.id,
+        user.email,
+        'password_changed',
+        'Your Fedha password was changed',
+        `Hi ${user.name},\n\nYour Fedha password was just changed. If this wasn't you, please contact support immediately.`,
+      )
+      .catch(() => {});
+    return { reset: true };
   }
 
   async requestPhoneVerification(userId: string) {
@@ -185,7 +231,7 @@ export class AuthService {
       },
     });
     if (!user) throw new UnauthorizedException();
-    return user;
+    return { ...user, isAdmin: process.env.ADMIN_EMAIL === user.email };
   }
 
   private issueTokens(userId: string, email: string) {
