@@ -4,24 +4,28 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { clearToken } from '../lib/api';
-
-const LINKS = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/accounts', label: 'Accounts' },
-  { href: '/transactions', label: 'Transactions' },
-  { href: '/budgets', label: 'Budgets' },
-  { href: '/goals', label: 'Savings Goals' },
-  { href: '/debts', label: 'Debts & Receivables' },
-  { href: '/recurring', label: 'Recurring' },
-  { href: '/reports', label: 'Reports' },
-  { href: '/history', label: 'History' },
-  { href: '/profile', label: 'Profile' },
-];
+import { useLanguage } from '../lib/i18n';
 
 export default function NavBar() {
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const { lang, setLang, t } = useLanguage();
+
+  const LINKS = [
+    { href: '/dashboard', label: t('dashboard') },
+    { href: '/accounts', label: t('accounts') },
+    { href: '/transactions', label: t('transactions') },
+    { href: '/budgets', label: t('budgets') },
+    { href: '/goals', label: t('goals') },
+    { href: '/debts', label: t('debts') },
+    { href: '/recurring', label: t('recurring') },
+    { href: '/search', label: t('search') },
+    { href: '/reports', label: t('reports') },
+    { href: '/history', label: t('history') },
+    { href: '/profile', label: t('profile') },
+    { href: '/admin', label: t('admin') },
+  ];
 
   function logout() {
     clearToken();
@@ -35,24 +39,34 @@ export default function NavBar() {
           Fedha
         </Link>
 
-        <button
-          onClick={() => setOpen(!open)}
-          aria-label="Open menu"
-          aria-expanded={open}
-          className="p-2 -mr-2 rounded-lg hover:bg-white/10 transition"
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            {open ? (
-              <path d="M6 6l12 12M18 6L6 18" />
-            ) : (
-              <>
-                <path d="M4 7h16" />
-                <path d="M4 12h16" />
-                <path d="M4 17h16" />
-              </>
-            )}
-          </svg>
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setLang(lang === 'en' ? 'sw' : 'en')}
+            className="px-2 py-1 text-xs font-semibold rounded-md border border-white/30 hover:bg-white/10 transition"
+            aria-label="Toggle language"
+          >
+            {lang === 'en' ? 'EN' : 'SW'}
+          </button>
+
+          <button
+            onClick={() => setOpen(!open)}
+            aria-label="Open menu"
+            aria-expanded={open}
+            className="p-2 -mr-2 rounded-lg hover:bg-white/10 transition"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              {open ? (
+                <path d="M6 6l12 12M18 6L6 18" />
+              ) : (
+                <>
+                  <path d="M4 7h16" />
+                  <path d="M4 12h16" />
+                  <path d="M4 17h16" />
+                </>
+              )}
+            </svg>
+          </button>
+        </div>
       </div>
 
       {open && (
@@ -62,7 +76,7 @@ export default function NavBar() {
             onClick={() => setOpen(false)}
             className="fixed inset-0 bg-black/30 z-30"
           />
-          <div className="absolute right-4 sm:right-6 top-full mt-2 w-60 bg-white text-fedha-navy rounded-xl shadow-lg border overflow-hidden z-40">
+          <div className="absolute right-4 sm:right-6 top-full mt-2 w-60 bg-white text-fedha-navy rounded-xl shadow-lg border overflow-hidden z-40 max-h-[70vh] overflow-y-auto">
             {LINKS.map((l) => {
               const active = pathname === l.href;
               return (
@@ -82,7 +96,7 @@ export default function NavBar() {
               onClick={logout}
               className="block w-full text-left px-4 py-3 text-sm font-medium text-fedha-red hover:bg-gray-50"
             >
-              Log out
+              {t('logout')}
             </button>
           </div>
         </>

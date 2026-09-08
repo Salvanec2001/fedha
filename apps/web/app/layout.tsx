@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { LanguageProvider } from '../lib/i18n';
 
 export const metadata: Metadata = {
   title: 'Fedha — Your Money. Your Plan. Your Future.',
@@ -29,7 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        {children}
+        <LanguageProvider>{children}</LanguageProvider>
         <script
           dangerouslySetInnerHTML={{
             __html: `
